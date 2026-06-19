@@ -117,7 +117,7 @@ function Install-Wintun {
         return
     }
 
-    Write-Info "Fetching Wintun $WintunVersion: $WintunUrl"
+    Write-Info "Fetching Wintun ${WintunVersion}: $WintunUrl"
     $tmpZip = Join-Path $env:TEMP "wintun-$WintunVersion.zip"
     $tmpDir = Join-Path $env:TEMP "wintun-$WintunVersion"
     Invoke-WebRequest -Uri $WintunUrl -OutFile $tmpZip -TimeoutSec 120
