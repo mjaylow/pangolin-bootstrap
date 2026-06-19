@@ -1,0 +1,6 @@
+# binaries are downloaded at runtime, never committed
+*.exe
+# local/secret overrides
+*.local.ps1
+*.secrets
+.DS_Store
