@@ -36,8 +36,8 @@ $ProgressPreference     = 'SilentlyContinue'   # suppress the slow/buggy IWR pro
 
 # --- Repos / asset naming (confirmed from fosrl get-newt.sh / get-olm.sh) ----
 $Repos = @{
-    newt = @{ Repo = 'fosrl/newt'; Display = 'Newt (site connector)' }
-    olm  = @{ Repo = 'fosrl/olm';  Display = 'Olm (client tunnel)'  }
+    newt = @{ Repo = 'fosrl/newt'; Display = 'Newt (site connector)'; Service = 'NewtWireguardService' }
+    olm  = @{ Repo = 'fosrl/olm';  Display = 'Olm (client tunnel)';  Service = 'OlmWireguardService'  }
 }
 
 # ---------------------------------------------------------------------------
@@ -119,6 +119,7 @@ function Install-Client {
         [string]$Endpoint
     )
     $disp = $Repos[$Key].Display
+    $svc  = $Repos[$Key].Service
 
     Write-Step "Configuring $disp as a Windows service"
 
@@ -133,6 +134,19 @@ function Install-Client {
     Write-Info 'Starting with supplied credentials...'
     Invoke-Exe -Exe $Exe -ExeArgs @('start', '--id', $Id, '--secret', $Secret, '--endpoint', $Endpoint) | Out-Null
 
+    # The client's installer registers the service as Manual start; force Automatic so it
+    # comes up on boot without anyone logging in.
+    Write-Info "Setting '$svc' startup type to Automatic..."
+    $startMode = 'unknown'
+    try {
+        Set-Service -Name $svc -StartupType Automatic -ErrorAction Stop
+        $startMode = (Get-CimInstance Win32_Service -Filter "Name='$svc'" -ErrorAction SilentlyContinue).StartMode
+        if (-not $startMode) { $startMode = 'Auto' }
+        Write-Ok "Startup type: $startMode"
+    } catch {
+        Write-Warn2 "Could not set startup type on ${svc}: $($_.Exception.Message)"
+    }
+
     Start-Sleep -Seconds 2
     Write-Info 'Status:'
     $status = Invoke-Exe -Exe $Exe -ExeArgs @('status')
@@ -145,6 +159,7 @@ function Install-Client {
         Component = $disp
         Exe       = $Exe
         Running   = [bool]$running
+        StartMode = $startMode
         Status    = ($status.Trim() -split "`r?`n" | Select-Object -Last 1)
     }
 }
@@ -251,7 +266,7 @@ Write-Host ''
 foreach ($r in $results) {
     $tag = if ($r.Running) { '[ RUNNING ]' } else { '[ CHECK ]' }
     $col = if ($r.Running) { 'Green' } else { 'Yellow' }
-    Write-Host ("  {0,-11} {1,-22} v{2,-9} {3}" -f $tag, $r.Component, $r.Version, $r.Status) -ForegroundColor $col
+    Write-Host ("  {0,-11} {1,-22} v{2,-8} startup={3,-9} {4}" -f $tag, $r.Component, $r.Version, $r.StartMode, $r.Status) -ForegroundColor $col
 }
 Write-Host ''
 Write-Warn2 'Security: secrets were typed into this console. Regenerate them in Pangolin once migration is verified.'
@@ -271,15 +286,16 @@ while ($ans -eq 'y' -or $ans -eq 'yes') {
     $ip = Read-Required "    Internal IP for $label"
 
     Write-Step "Pinging $label ($ip) x3"
-    try {
-        $ok = Test-Connection -ComputerName $ip -Count 3 -ErrorAction Stop
-        foreach ($p in $ok) {
-            $rtt = if ($null -ne $p.ResponseTime) { $p.ResponseTime } else { $p.Latency }
-            Write-Host ("      reply from {0}  time={1}ms" -f $ip, $rtt) -ForegroundColor DarkGray
-        }
+    # ping.exe is more robust than Test-Connection, which can throw
+    # "Error due to lack of resources" via its WMI/Win32_PingStatus backend.
+    $pingOut = & ping.exe -n 3 -w 1000 $ip 2>&1
+    foreach ($line in $pingOut) {
+        if ("$line".Trim()) { Write-Host "      $line" -ForegroundColor DarkGray }
+    }
+    if ($LASTEXITCODE -eq 0 -and ($pingOut -match '(?i)Reply from')) {
         Write-Ok "$label ($ip) is reachable."
-    } catch {
-        Write-Err2 "$label ($ip) did not respond: $($_.Exception.Message)"
+    } else {
+        Write-Err2 "$label ($ip) did not respond (no successful replies)."
     }
 
     Write-Host ''

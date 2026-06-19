@@ -9,7 +9,7 @@ One script, run elevated on the target box. It:
 1. Asks what to install — **Newt only / Newt + Olm / Olm only**
 2. Prompts for the endpoint and the relevant site/client IDs + secrets
 3. Downloads the **latest** Windows binaries from GitHub releases into `C:\_CDO\pangolin`
-4. Registers and starts each client as a **native Windows service** (`install` → `start` → `status`)
+4. Registers and starts each client as a **native Windows service** (`install` → `start` → set **Automatic** startup → `status`). The fosrl installer registers services as *Manual*, so the script forces `NewtWireguardService` / `OlmWireguardService` to **Automatic** start.
 5. Prints a summary
 6. Optionally runs a 3-count ping test against an internal host (head office / SQL-Data Director / custom)
 
