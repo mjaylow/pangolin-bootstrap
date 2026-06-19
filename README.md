@@ -18,6 +18,9 @@ recovers without a logged-in session or scheduled task.
 
 ## Run it
 
+The script first asks for a **mode** — *Install / repair* or *Uninstall* — then which
+component(s) to act on (**Newt only / Newt + Olm / Olm only**).
+
 Elevated PowerShell (Run as administrator) on the target server.
 
 ### Bootstrap one-liner
@@ -66,6 +69,25 @@ Leave it blank to always be prompted. Provide a value via `-Endpoint` at runtime
 
 Version is resolved per-run from each repo's GitHub `releases/latest`. Architecture
 (`amd64`/`arm64`) is detected automatically.
+
+### Olm needs Wintun
+
+Newt is userspace WireGuard (netstack) and needs no driver. **Olm** creates a real TUN
+adapter, so it requires `wintun.dll` next to `olm.exe` — this is the only thing fosrl's
+`olm_windows_installer.exe` adds over the raw binary. The script downloads the signed
+[Wintun](https://www.wintun.net) `0.14.1` DLL into `C:\_CDO\pangolin` (SHA-256 verified)
+when installing Olm. Without it Olm logs: `Failed to create TUN device: Error loading
+wintun.dll`.
+
+## Uninstall
+
+Choose **Uninstall** at the mode prompt, then pick Newt only / Newt + Olm / Olm only.
+For each selected client it stops and removes the Windows service (via the client's own
+`uninstall`, with an `sc.exe delete` fallback by service name). It then asks whether to
+**also delete** the binaries and saved config (`C:\_CDO\pangolin\<client>.exe`,
+`wintun.dll` for Olm, and `C:\ProgramData\<client>\`) — answer `N` to leave files in
+place and only remove the services. A final `yes` confirmation is required before anything
+is changed.
 
 ## Re-running / switching from the old manual or scheduled-task setup
 
