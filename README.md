@@ -1,8 +1,10 @@
 # pangolin-bootstrap
 
 Interactive bootstrap for the [Pangolin](https://docs.pangolin.net) tunnel clients
-**Newt** (site/network connector) and **Olm** (client-to-Newt tunnel) on **HThai**
-head office and store servers.
+**Newt** (site/network connector) and **Olm** (client-to-Newt tunnel) on Windows
+head office and store servers. Site-agnostic — the Pangolin endpoint and all
+site/client IDs and secrets are supplied per run, so the same script serves any
+environment.
 
 One script, run elevated on the target box. It:
 
@@ -11,7 +13,7 @@ One script, run elevated on the target box. It:
 3. Downloads the **latest** Windows binaries from GitHub releases into `C:\_CDO\pangolin`
 4. Registers and starts each client as a **native Windows service** (`install` → `start` → set **Automatic** startup → `status`). The fosrl installer registers services as *Manual*, so the script forces `NewtWireguardService` / `OlmWireguardService` to **Automatic** start.
 5. Prints a summary
-6. Optionally runs a 3-count ping test against an internal host (head office / SQL-Data Director / custom)
+6. Optionally runs a 3-count ping test against an internal host/service reachable over Pangolin
 
 Running as a service means the tunnel starts with Windows, survives logoff/reboot, and
 recovers without a logged-in session or scheduled task.
@@ -43,11 +45,11 @@ Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass -Force
 
 | Param         | Default              | Notes                                                                 |
 |---------------|----------------------|-----------------------------------------------------------------------|
-| `-Endpoint`   | *(set in script)*    | HThai Pangolin endpoint. If empty, the script prompts. Pass to override. |
+| `-Endpoint`   | *(set in script)*    | Pangolin endpoint for the target environment. If empty, the script prompts. Pass to override. |
 | `-InstallDir` | `C:\_CDO\pangolin`   | Where binaries + services live.                                       |
 
 ```powershell
-.\Setup-Pangolin.ps1 -Endpoint https://th-pangolin.prod.hthai-azure.gillcapitalinternal.com
+.\Setup-Pangolin.ps1 -Endpoint https://pangolin.example.com
 ```
 
 ## Set the default endpoint
@@ -55,7 +57,7 @@ Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass -Force
 Edit the `$Endpoint` default near the top of `Setup-Pangolin.ps1`:
 
 ```powershell
-[string]$Endpoint = 'https://<HThai-pangolin-endpoint>',
+[string]$Endpoint = 'https://pangolin.example.com',
 ```
 
 Leave it blank to always be prompted. Provide a value via `-Endpoint` at runtime to override.

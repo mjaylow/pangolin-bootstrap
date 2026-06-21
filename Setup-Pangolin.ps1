@@ -1,10 +1,11 @@
 <#
 .SYNOPSIS
-    HThai Pangolin connector bootstrap - installs Newt and/or Olm as Windows services.
+    Pangolin connector bootstrap - installs Newt and/or Olm as Windows services.
 
 .DESCRIPTION
     Interactive installer for Pangolin tunnel clients (fosrl/newt, fosrl/olm) on
-    HThai head office and store servers.
+    Windows head office and store servers. Site-agnostic - endpoint, IDs and
+    secrets are supplied per run, so the same script serves any environment.
 
       1. Pick what to install (Newt only / Newt + Olm / Olm only)
       2. Provide the site/client IDs, secrets and endpoint
@@ -17,17 +18,17 @@
       irm https://raw.githubusercontent.com/<you>/pangolin-bootstrap/main/Setup-Pangolin.ps1 | iex
 
 .NOTES
-    Entity : HThai (Gill Capital)
+    Reuse  : site-agnostic - pass -Endpoint (and IDs/secrets) per environment
     Clients: newt = site/network connector, olm = client-to-Newt tunnel
 #>
 
 [CmdletBinding()]
 param(
-    # Pangolin endpoint. Hardcoded default for HThai; leave as $null/empty to force a prompt.
-    # >>> SET THIS to the HThai Pangolin endpoint, e.g. https://th-pangolin.prod.hthai-azure.gillcapitalinternal.com
+    # Optional default Pangolin endpoint; leave empty to force a prompt each run.
+    # >>> Optionally set a per-environment default, e.g. https://pangolin.example.com
     [string]$Endpoint = '',
 
-    # Install root. Matches the Cambodia/H&M convention.
+    # Install root (override with -InstallDir).
     [string]$InstallDir = 'C:\_CDO\pangolin'
 )
 
@@ -78,7 +79,7 @@ function Get-LatestVersion {
     param([string]$Repo)
     $api = "https://api.github.com/repos/$Repo/releases/latest"
     Write-Info "Querying latest release: $api"
-    $headers = @{ 'User-Agent' = 'hthai-pangolin-bootstrap' }
+    $headers = @{ 'User-Agent' = 'pangolin-bootstrap' }
     $rel = Invoke-RestMethod -Uri $api -Headers $headers -TimeoutSec 30
     $tag = $rel.tag_name -replace '^v', ''
     if (-not $tag) { throw "Could not resolve latest version for $Repo" }
@@ -99,7 +100,7 @@ function Get-Binary {
 
     Write-Info "Download: $url"
     Write-Info "Target  : $outPath"
-    $headers = @{ 'User-Agent' = 'hthai-pangolin-bootstrap' }
+    $headers = @{ 'User-Agent' = 'pangolin-bootstrap' }
     Invoke-WebRequest -Uri $url -OutFile $outPath -Headers $headers -TimeoutSec 120
     if (-not (Test-Path $outPath)) { throw "Download failed: $outPath not found" }
     $size = '{0:N1} MB' -f ((Get-Item $outPath).Length / 1MB)
@@ -277,7 +278,7 @@ function Uninstall-Client {
 # Main
 # ---------------------------------------------------------------------------
 Write-Host '======================================================' -ForegroundColor White
-Write-Host '   HThai - Pangolin connector bootstrap (Newt / Olm)' -ForegroundColor White
+Write-Host '   Pangolin connector bootstrap (Newt / Olm)' -ForegroundColor White
 Write-Host '======================================================' -ForegroundColor White
 
 Assert-Admin
@@ -407,34 +408,27 @@ Write-Host ''
 Write-Warn2 'Security: secrets were typed into this console. Regenerate them in Pangolin once migration is verified.'
 Write-Info  'Confirm each site/client shows Online in the Pangolin dashboard.'
 
-# 7. Optional ping test
+# 7. Optional connectivity test
 Write-Host ''
-$ans = (Read-Host 'Run a connectivity ping test now? (y/N)').Trim().ToLower()
+$ans = (Read-Host 'Ping an internal service/server reachable over Pangolin? (y/N)').Trim().ToLower()
 while ($ans -eq 'y' -or $ans -eq 'yes') {
-    Write-Host ''
-    Write-Host '    Target:' -ForegroundColor Gray
-    Write-Host '      1) Head office server'
-    Write-Host '      2) SQL / Data Director server'
-    Write-Host '      3) Other'
-    do { $t = (Read-Host '    Select 1-3').Trim() } while ($t -notin '1','2','3')
-    $label = switch ($t) { '1' {'Head office'} '2' {'SQL / Data Director'} default {'Custom host'} }
-    $ip = Read-Required "    Internal IP for $label"
+    $target = Read-Required '    Internal host or IP to ping'
 
-    Write-Step "Pinging $label ($ip) x3"
+    Write-Step "Pinging $target x3"
     # ping.exe is more robust than Test-Connection, which can throw
     # "Error due to lack of resources" via its WMI/Win32_PingStatus backend.
-    $pingOut = & ping.exe -n 3 -w 1000 $ip 2>&1
+    $pingOut = & ping.exe -n 3 -w 1000 $target 2>&1
     foreach ($line in $pingOut) {
         if ("$line".Trim()) { Write-Host "      $line" -ForegroundColor DarkGray }
     }
     if ($LASTEXITCODE -eq 0 -and ($pingOut -match '(?i)Reply from')) {
-        Write-Ok "$label ($ip) is reachable."
+        Write-Ok "$target is reachable."
     } else {
-        Write-Err2 "$label ($ip) did not respond (no successful replies)."
+        Write-Err2 "$target did not respond (no successful replies)."
     }
 
     Write-Host ''
-    $ans = (Read-Host 'Test another host? (y/N)').Trim().ToLower()
+    $ans = (Read-Host 'Test another? (y/N)').Trim().ToLower()
 }
 
 Write-Host ''
