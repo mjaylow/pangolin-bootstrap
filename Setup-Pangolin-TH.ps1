@@ -39,10 +39,6 @@ param(
 $ErrorActionPreference = 'Stop'
 $ProgressPreference     = 'SilentlyContinue'
 
-# Force TLS 1.2 BEFORE any network call. Old POS terminals default to TLS 1.0/1.1,
-# which GitHub and wintun.net now reject - downloads fail without this.
-[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-
 # --- Fixed TH environment ---------------------------------------------------
 $Endpoint   = 'https://th-pangolin.prod.hthai-azure.gillcapitalinternal.com'
 $OlmRepo    = 'fosrl/olm'
@@ -147,6 +143,7 @@ Write-Info "Endpoint : $Endpoint"
 Write-Info "Host     : $env:COMPUTERNAME"
 
 Assert-Admin
+[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 
 # 1. Credentials (from the machine/id/secret sheet) --------------------------
 Write-Step 'Olm credentials for THIS POS'
