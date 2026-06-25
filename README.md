@@ -4,10 +4,18 @@
 ![PowerShell](https://img.shields.io/badge/PowerShell-5.1%2B-5391FE?logo=powershell&logoColor=white)
 ![Pangolin](https://img.shields.io/badge/Pangolin-Newt%20%2F%20Olm-2ea44f)
 
-One interactive PowerShell script to install, repair, or remove the
-[Pangolin](https://docs.pangolin.net) tunnel clients **Newt** and **Olm** as native
-**Windows services** — on head office boxes, store servers, or any Windows host that
-needs to join a Pangolin network.
+PowerShell installers for the [Pangolin](https://docs.pangolin.net) tunnel clients
+**Newt** and **Olm** as native **Windows services** — on head office boxes, store
+servers, or any Windows host that needs to join a Pangolin network. Two scripts:
+
+- **`Setup-Pangolin.ps1`** — flexible interactive installer (Newt and/or Olm; endpoint
+  and credentials supplied per run).
+- **`Setup-Pangolin-TH.ps1`** — Olm-only variant with the **endpoint baked in**, for
+  fleet rollouts where operators paste only an ID + secret. See
+  [Fixed-endpoint installer](#fixed-endpoint-installer--setup-pangolin-thps1).
+
+> Bulk-creating the Olm clients (Integration API) is a separate, **private** admin tool
+> — see the `pangolin-provisioning` repo. This repo is just the device-side installers.
 
 It is **site-agnostic**: the Pangolin endpoint and all site/client IDs and secrets are
 supplied per run, so the same script works for any environment. Binaries are pulled
@@ -104,7 +112,20 @@ To avoid typing the endpoint every run, edit the default near the top of
 
 Leave it `''` to always prompt. A value passed with `-Endpoint` always wins.
 
-## What gets installed, and where
+## Fixed-endpoint installer — `Setup-Pangolin-TH.ps1`
+
+A trimmed, **Olm-only** variant with the Pangolin **endpoint hard-coded**, for fleet
+rollouts where operators shouldn't have to know or type the endpoint. It prompts only
+for the **client ID** and **secret** (or accepts `-Id` / `-Secret`), then downloads
+Olm + Wintun and installs the service exactly like the main script.
+
+```powershell
+# operators: paste the id + secret for THIS device when prompted
+irm https://raw.githubusercontent.com/mjaylow/pangolin-bootstrap/main/Setup-Pangolin-TH.ps1 | iex
+```
+
+Before sharing it, set the `$Endpoint` value near the top of the script to your own
+Pangolin server. Per-device credentials are issued by whoever administers Pangolin.
 
 | Item                  | Location                                                       |
 | --------------------- | ------------------------------------------------------------- |

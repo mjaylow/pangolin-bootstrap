@@ -4,3 +4,6 @@
 *.local.ps1
 *.secrets
 .DS_Store
+# provisioning artifacts belong in the private pangolin-provisioning repo, not here
+pos-*.csv
+pos-*.txt
