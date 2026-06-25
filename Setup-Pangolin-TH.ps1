@@ -12,7 +12,7 @@
       2. Operator is prompted for Olm ID and Secret (the row for THIS POS).
       3. Latest olm + wintun are downloaded into C:\_CDO\pangolin.
       4. Olm is registered and started as an Automatic Windows service.
-      5. A short summary + optional ping test confirm connectivity.
+      5. A short summary confirms the service state.
 
     Run from an ELEVATED PowerShell. One-liner (operator just pastes id/secret):
       irm https://raw.githubusercontent.com/<you>/pangolin-bootstrap/main/Setup-Pangolin-TH.ps1 | iex
@@ -38,6 +38,10 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $ProgressPreference     = 'SilentlyContinue'
+
+# Force TLS 1.2 BEFORE any network call. Old POS terminals default to TLS 1.0/1.1,
+# which GitHub and wintun.net now reject - downloads fail without this.
+[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 
 # --- Fixed TH environment ---------------------------------------------------
 $Endpoint   = 'https://th-pangolin.prod.hthai-azure.gillcapitalinternal.com'
@@ -143,7 +147,6 @@ Write-Info "Endpoint : $Endpoint"
 Write-Info "Host     : $env:COMPUTERNAME"
 
 Assert-Admin
-[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 
 # 1. Credentials (from the machine/id/secret sheet) --------------------------
 Write-Step 'Olm credentials for THIS POS'
@@ -215,20 +218,6 @@ Write-Host ''
 if ($running) { Write-Ok 'Olm service is running.' }
 else          { Write-Warn2 "Olm installed but status does not clearly show 'running' - verify in Pangolin (Clients > Machines)." }
 Write-Info 'Confirm this client shows Connected in the Pangolin dashboard.'
-
-# 6. Optional connectivity test ----------------------------------------------
-Write-Host ''
-$ans = (Read-Host 'Ping an internal host reachable via th-ls-app? (y/N)').Trim().ToLower()
-while ($ans -eq 'y' -or $ans -eq 'yes') {
-    $target  = Read-Required '    Internal host or IP to ping'
-    Write-Step "Pinging $target x3"
-    $pingOut = & ping.exe -n 3 -w 1000 $target 2>&1
-    foreach ($line in $pingOut) { if ("$line".Trim()) { Write-Host "      $line" -ForegroundColor DarkGray } }
-    if ($LASTEXITCODE -eq 0 -and ($pingOut -match '(?i)Reply from')) { Write-Ok "$target is reachable." }
-    else { Write-Err2 "$target did not respond." }
-    Write-Host ''
-    $ans = (Read-Host 'Test another? (y/N)').Trim().ToLower()
-}
 
 Write-Host ''
 Write-Ok 'Done.'

@@ -35,6 +35,10 @@ param(
 $ErrorActionPreference = 'Stop'
 $ProgressPreference     = 'SilentlyContinue'   # suppress the slow/buggy IWR progress bar
 
+# Force TLS 1.2 BEFORE any network call. Old POS / Windows Server boxes default
+# to TLS 1.0/1.1, which GitHub and wintun.net now reject - downloads fail without this.
+[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+
 # --- Repos / asset naming (confirmed from fosrl get-newt.sh / get-olm.sh) ----
 $Repos = @{
     newt = @{ Repo = 'fosrl/newt'; Display = 'Newt (site connector)'; Service = 'NewtWireguardService' }
@@ -282,7 +286,6 @@ Write-Host '   Pangolin connector bootstrap (Newt / Olm)' -ForegroundColor White
 Write-Host '======================================================' -ForegroundColor White
 
 Assert-Admin
-[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12  # older Windows Server
 
 # 1. Mode
 Write-Step 'What do you want to do?'
