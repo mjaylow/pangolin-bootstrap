@@ -46,8 +46,14 @@ $Repos = @{
 # exactly what fosrl's olm_windows_installer.exe bundles). Newt is userspace
 # (netstack) and needs nothing. Signed DLL from the canonical WireGuard source.
 $WintunVersion = '0.14.1'
-$WintunUrl     = "https://www.wintun.net/builds/wintun-$WintunVersion.zip"
 $WintunZipSha  = '07c256185d6ee3652e09fa55c0b673e2624b565e02c4b9091c79ca7d2f24ef51'
+# POS/store firewalls often allow GitHub but block wintun.net, so try the copy
+# vendored in this repo first, then fall back to the canonical source. The
+# SHA-256 below is verified after download regardless of which source served it.
+$WintunUrls    = @(
+    "https://raw.githubusercontent.com/mjaylow/pangolin-bootstrap/main/vendor/wintun-$WintunVersion.zip",
+    "https://www.wintun.net/builds/wintun-$WintunVersion.zip"
+)
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -118,10 +124,22 @@ function Install-Wintun {
         return
     }
 
-    Write-Info "Fetching Wintun ${WintunVersion}: $WintunUrl"
     $tmpZip = Join-Path $env:TEMP "wintun-$WintunVersion.zip"
     $tmpDir = Join-Path $env:TEMP "wintun-$WintunVersion"
-    Invoke-WebRequest -Uri $WintunUrl -OutFile $tmpZip -TimeoutSec 120
+
+    $headers     = @{ 'User-Agent' = 'pangolin-bootstrap' }
+    $downloaded  = $false
+    foreach ($u in $WintunUrls) {
+        try {
+            Write-Info "Fetching Wintun ${WintunVersion}: $u"
+            Invoke-WebRequest -Uri $u -OutFile $tmpZip -Headers $headers -TimeoutSec 120
+            $downloaded = $true
+            break
+        } catch {
+            Write-Warn2 "Source unreachable ($u): $($_.Exception.Message)"
+        }
+    }
+    if (-not $downloaded) { throw "Could not download wintun from any source (tried: $($WintunUrls -join ', '))" }
 
     $sha = (Get-FileHash -Path $tmpZip -Algorithm SHA256).Hash
     if ($sha -ne $WintunZipSha.ToUpper()) {
