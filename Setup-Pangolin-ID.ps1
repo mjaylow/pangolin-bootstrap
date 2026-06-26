@@ -1,32 +1,33 @@
 <#
 .SYNOPSIS
-    Pangolin connector bootstrap - installs Newt and/or Olm as Windows services.
+    Pangolin connector bootstrap (ID / Indonesia) - installs Newt and/or Olm as
+    Windows services, with the Indonesia endpoint pre-filled as the default.
 
 .DESCRIPTION
-    Interactive installer for Pangolin tunnel clients (fosrl/newt, fosrl/olm) on
-    Windows head office and store servers. Site-agnostic - endpoint, IDs and
-    secrets are supplied per run, so the same script serves any environment.
+    Indonesia (ID) variant of Setup-Pangolin.ps1. Identical flow, but the
+    Pangolin endpoint defaults to the ID server so the operator can just press
+    Enter at the endpoint prompt. IDs and secrets are still supplied per run.
 
-      1. Pick what to install (Newt only / Newt + Olm / Olm only)
-      2. Provide the site/client IDs, secrets and endpoint
-      3. Latest Windows binaries are downloaded into C:\_CDO\pangolin
-      4. Each client is registered and started as a native Windows service
-      5. A summary is printed
-      6. Optionally run a 3-count ping test against an internal host
+      1. Optionally install the Windows OpenSSH Server for remote access
+      2. Pick what to install (Newt only / Newt + Olm / Olm only)
+      3. Provide the site/client IDs and secrets (endpoint defaults to ID)
+      4. Latest Windows binaries are downloaded into C:\_CDO\pangolin
+      5. Each client is registered and started as a native Windows service
+      6. A summary is printed, then an optional 3-count ping test
 
     Run from an elevated PowerShell. Bootstrap one-liner:
-      irm https://raw.githubusercontent.com/<you>/pangolin-bootstrap/main/Setup-Pangolin.ps1 | iex
+      irm https://raw.githubusercontent.com/<you>/pangolin-bootstrap/main/Setup-Pangolin-ID.ps1 | iex
 
 .NOTES
-    Reuse  : site-agnostic - pass -Endpoint (and IDs/secrets) per environment
-    Clients: newt = site/network connector, olm = client-to-Newt tunnel
+    Endpoint : https://id-pangolin.prod.hthai-azure.gillcapitalinternal.com
+    Clients  : newt = site/network connector, olm = client-to-Newt tunnel
 #>
 
 [CmdletBinding()]
 param(
-    # Optional default Pangolin endpoint; leave empty to force a prompt each run.
-    # >>> Optionally set a per-environment default, e.g. https://pangolin.example.com
-    [string]$Endpoint = '',
+    # Indonesia (ID) Pangolin endpoint, pre-filled as the default. Operators press
+    # Enter to accept, or pass -Endpoint to override.
+    [string]$Endpoint = 'https://id-pangolin.prod.hthai-azure.gillcapitalinternal.com',
 
     # Install root (override with -InstallDir).
     [string]$InstallDir = 'C:\_CDO\pangolin',

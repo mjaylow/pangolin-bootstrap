@@ -6,13 +6,20 @@
 
 PowerShell installers for the [Pangolin](https://docs.pangolin.net) tunnel clients
 **Newt** and **Olm** as native **Windows services** — on head office boxes, store
-servers, or any Windows host that needs to join a Pangolin network. Two scripts:
+servers, or any Windows host that needs to join a Pangolin network. Three scripts:
 
 - **`Setup-Pangolin.ps1`** — flexible interactive installer (Newt and/or Olm; endpoint
   and credentials supplied per run).
-- **`Setup-Pangolin-TH.ps1`** — Olm-only variant with the **endpoint baked in**, for
-  fleet rollouts where operators paste only an ID + secret. See
-  [Fixed-endpoint installer](#fixed-endpoint-installer--setup-pangolin-thps1).
+- **`Setup-Pangolin-TH.ps1`** — Olm-only variant with the **Thailand endpoint baked
+  in**, for fleet rollouts where operators paste only an ID + secret. See
+  [Fixed-endpoint installers](#fixed-endpoint-installers--th--id).
+- **`Setup-Pangolin-ID.ps1`** — the full installer with the **Indonesia endpoint
+  pre-filled** as the default (operators press Enter to accept). See
+  [Fixed-endpoint installers](#fixed-endpoint-installers--th--id).
+
+All three can **optionally install the Windows OpenSSH Server** for remote access —
+you're prompted (default **No**), or pass `-InstallSsh y` / `-InstallSsh n` for
+unattended runs.
 
 > Bulk-creating the Olm clients (Integration API) is a separate, **private** admin tool
 > — see the `pangolin-provisioning` repo. This repo is just the device-side installers.
@@ -46,8 +53,13 @@ reach sites, or **both** on a box that does each.
 - **Windows PowerShell 5.1+** (the built-in `powershell.exe` is fine).
 - **Elevated PowerShell** (Run as administrator) — required to register services.
 - **Outbound HTTPS (443)** to:
-  - `api.github.com` and `github.com` — Newt/Olm binaries
+  - `api.github.com` and `github.com` — Newt/Olm binaries (and the OpenSSH Server
+    fallback, if Windows Update is blocked)
   - `www.wintun.net` — the Wintun driver (Olm only)
+- **Optional — OpenSSH Server** (only if you opt in): installs via the native
+  `Add-WindowsCapability` (needs Windows Update / Features-on-Demand), falling back to
+  the [PowerShell/Win32-OpenSSH](https://github.com/PowerShell/Win32-OpenSSH) GitHub
+  release. Opens inbound **TCP 22** and sets `sshd` to **Automatic**.
 - **Pangolin credentials** for whatever you are installing:
   - Newt → **site ID + secret** (Pangolin → *Sites*)
   - Olm → **client ID + secret** (Pangolin → *Clients*)
@@ -81,13 +93,17 @@ The script is fully interactive and walks through:
 
 1. **Mode** — `1) Install / repair` or `2) Uninstall`.
 2. **Component(s)** — `1) Newt only`, `2) Newt + Olm`, or `3) Olm only`.
-3. **Connection details** — the endpoint (uses the default if one is set, otherwise
+3. **OpenSSH Server (optional)** — on install, asks whether to also install the Windows
+   OpenSSH Server (default **No**). When accepted, it installs `sshd`, sets it to
+   **Automatic**, starts it, and opens inbound TCP 22. Skip the prompt with
+   `-InstallSsh y` / `-InstallSsh n`.
+4. **Connection details** — the endpoint (uses the default if one is set, otherwise
    prompts), then the site/client ID + secret for each selected client.
-4. **Download + install** — resolves the latest release, downloads the right binary
+5. **Download + install** — resolves the latest release, downloads the right binary
    (and Wintun for Olm), registers the service, starts it with your credentials, and
    forces the service to **Automatic** startup.
-5. **Summary** — per client: running state, version, startup type, last status line.
-6. **Optional ping test** — ping an internal host reachable over Pangolin to confirm
+6. **Summary** — per client: running state, version, startup type, last status line.
+7. **Optional ping test** — ping an internal host reachable over Pangolin to confirm
    the tunnel actually carries traffic (repeatable).
 
 ### Parameters
@@ -96,9 +112,10 @@ The script is fully interactive and walks through:
 | ------------- | ------------------ | -------------------------------------------------------------------------------------- |
 | `-Endpoint`   | *(empty → prompts)*| Pangolin endpoint. Empty by default, so the script asks each run. Pass to skip the prompt or override a baked-in default. |
 | `-InstallDir` | `C:\_CDO\pangolin` | Where binaries, `wintun.dll`, and the services live.                                    |
+| `-InstallSsh` | *(empty → prompts)*| Install the OpenSSH Server. `y`/`n` (or `yes`/`no`) skips the prompt for unattended runs; empty asks interactively (default **No**). |
 
 ```powershell
-.\Setup-Pangolin.ps1 -Endpoint https://pangolin.example.com -InstallDir D:\pangolin
+.\Setup-Pangolin.ps1 -Endpoint https://pangolin.example.com -InstallDir D:\pangolin -InstallSsh y
 ```
 
 ### Setting a default endpoint
@@ -112,20 +129,43 @@ To avoid typing the endpoint every run, edit the default near the top of
 
 Leave it `''` to always prompt. A value passed with `-Endpoint` always wins.
 
-## Fixed-endpoint installer — `Setup-Pangolin-TH.ps1`
+## Fixed-endpoint installers — TH & ID
 
-A trimmed, **Olm-only** variant with the Pangolin **endpoint hard-coded**, for fleet
-rollouts where operators shouldn't have to know or type the endpoint. It prompts only
-for the **client ID** and **secret** (or accepts `-Id` / `-Secret`), then downloads
+Two per-region variants ship with the Pangolin **endpoint pre-set**, for fleet rollouts
+where operators shouldn't have to know or type the endpoint. Both still optionally
+install the OpenSSH Server (prompt, or `-InstallSsh y`/`n`).
+
+### `Setup-Pangolin-TH.ps1` — Thailand (Olm-only, no menus)
+
+A trimmed, **Olm-only** variant with the Pangolin **endpoint hard-coded**. It prompts
+only for the **client ID** and **secret** (or accepts `-Id` / `-Secret`), then downloads
 Olm + Wintun and installs the service exactly like the main script.
 
 ```powershell
 # operators: paste the id + secret for THIS device when prompted
 irm https://raw.githubusercontent.com/mjaylow/pangolin-bootstrap/main/Setup-Pangolin-TH.ps1 | iex
+
+# unattended (deployment tool): credentials + skip the SSH prompt
+.\Setup-Pangolin-TH.ps1 -Id <olmId> -Secret <olmSecret> -InstallSsh n
 ```
 
-Before sharing it, set the `$Endpoint` value near the top of the script to your own
-Pangolin server. Per-device credentials are issued by whoever administers Pangolin.
+Endpoint: `https://th-pangolin.prod.hthai-azure.gillcapitalinternal.com` (set near the
+top of the script).
+
+### `Setup-Pangolin-ID.ps1` — Indonesia (full installer, endpoint pre-filled)
+
+A copy of the main `Setup-Pangolin.ps1` (same Newt/Olm menus, same flow) with the
+**Indonesia endpoint pre-filled as the default** — operators just press Enter at the
+endpoint prompt, or pass `-Endpoint` to override.
+
+```powershell
+irm https://raw.githubusercontent.com/mjaylow/pangolin-bootstrap/main/Setup-Pangolin-ID.ps1 | iex
+```
+
+Endpoint: `https://id-pangolin.prod.hthai-azure.gillcapitalinternal.com` (the `$Endpoint`
+default near the top of the script).
+
+Per-device credentials for both are issued by whoever administers Pangolin.
 
 | Item                  | Location                                                       |
 | --------------------- | ------------------------------------------------------------- |
@@ -192,6 +232,8 @@ services. A final `yes` confirmation is required before anything changes.
 | Service does not start after reboot                           | Check `services.msc` for `NewtWireguardService` / `OlmWireguardService` set to Automatic. |
 | Status does not clearly show *running*                        | Recheck ID/secret/endpoint, confirm **Online** in Pangolin, review `C:\ProgramData\<client>` logs. |
 | Ping test fails with a "lack of resources" style error        | The script already uses `ping.exe` (not `Test-Connection`) to avoid this WMI issue.       |
+| OpenSSH: `Add-WindowsCapability` fails (Windows Update blocked)| Expected on locked-down boxes — the script auto-falls back to the Win32-OpenSSH GitHub release. Confirm outbound 443 to GitHub. |
+| Can't reach the box over SSH after install                    | Confirm `sshd` is **Running**/Automatic in `services.msc` and that inbound **TCP 22** is allowed by any upstream/network firewall. |
 
 ## Security
 
