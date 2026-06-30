@@ -29,7 +29,15 @@ param(
     [string]$Endpoint = '',
 
     # Install root (override with -InstallDir).
-    [string]$InstallDir = 'C:\_CDO\pangolin'
+    [string]$InstallDir = 'C:\_CDO\pangolin',
+
+    # Non-interactive install. When -Component is set (with -Id, -Secret and
+    # -Endpoint), the menus are skipped and only that one client is installed as
+    # a Windows service. Used by the provisioning console's pastable one-liner.
+    [ValidateSet('newt', 'olm')]
+    [string]$Component = '',
+    [string]$Id        = '',
+    [string]$Secret    = ''
 )
 
 $ErrorActionPreference = 'Stop'
@@ -293,7 +301,36 @@ function Uninstall-Client {
 }
 
 # ---------------------------------------------------------------------------
-# Main
+# Non-interactive fast path (provisioning console one-liner)
+# ---------------------------------------------------------------------------
+# When -Component is supplied, skip all menus and install just that client as a
+# Windows service using the supplied -Id/-Secret/-Endpoint. Same Get-Binary /
+# Install-Wintun (olm) / Install-Client path the interactive flow uses.
+if ($Component) {
+    Write-Host '======================================================' -ForegroundColor White
+    Write-Host "   Pangolin bootstrap - non-interactive ($Component)" -ForegroundColor White
+    Write-Host '======================================================' -ForegroundColor White
+    Assert-Admin
+    [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+    if (-not $Id -or -not $Secret -or -not $Endpoint) {
+        Write-Err2 '-Component requires -Id, -Secret and -Endpoint.'
+        exit 1
+    }
+    $arch = Get-Arch
+    if (-not (Test-Path $InstallDir)) { New-Item -ItemType Directory -Path $InstallDir -Force | Out-Null }
+    Write-Step "Installing $($Repos[$Component].Display)"
+    $ver = Get-LatestVersion -Repo $Repos[$Component].Repo
+    Write-Ok "Latest $Component version: $ver"
+    $exe = Get-Binary -Key $Component -Version $ver -Arch $arch -DestDir $InstallDir
+    if ($Component -eq 'olm') { Install-Wintun -DestDir $InstallDir -Arch $arch }
+    $r = Install-Client -Key $Component -Exe $exe -Id $Id -Secret $Secret -Endpoint $Endpoint
+    Write-Host ''
+    Write-Ok ("Done: {0} v{1} startup={2} {3}" -f $r.Component, $ver, $r.StartMode, $r.Status)
+    exit 0
+}
+
+# ---------------------------------------------------------------------------
+# Main (interactive)
 # ---------------------------------------------------------------------------
 Write-Host '======================================================' -ForegroundColor White
 Write-Host '   Pangolin connector bootstrap (Newt / Olm)' -ForegroundColor White
